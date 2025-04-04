@@ -1,0 +1,10 @@
+#+TITLE: Voxel Heightmap Renderer
+
+* Overview
+A 3D voxel heightmap renderer that converts a 2D image into a 3D terrain using OpenGL.
+
+* Dependencies
+- [[https://www.glfw.org/][GLFW]] (window/input management)
+- [[https://glew.sourceforge.net/][GLEW]] (OpenGL extension loading)
+- [[https://github.com/recp/cglm][cglm]] (OpenGL mathematics library)
+- [[https://github.com/nothings/stb][stb_image]] (image loading)
