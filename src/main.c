@@ -364,6 +364,30 @@ static void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
   process_mouse_movement(camera, xoffset, yoffset, true);
 }
 
+typedef struct {
+  int width;
+  int height;
+  int channels;
+  uint8_t *data;
+} ImageData;
+
+ImageData load_image(const char *path) {
+  ImageData img;
+  img.data = stbi_load(path, &img.width, &img.height, &img.channels, 0);
+  if (!img.data) {
+    fprintf(stderr, "Failed to load image\n");
+    img.width = img.height = img.channels = 0;
+  }
+  return img;
+}
+
+void free_image(ImageData **img) {
+  if ((*img)->data) {
+    stbi_image_free((*img)->data);
+    (*img)->data = NULL;
+  }
+}
+
 static GLFWwindow *create_window(int width, int height, const char *title) {
   if (!glfwInit()) {
     fprintf(stderr, "Failed to initialize GLFW\n");
@@ -397,12 +421,24 @@ static GLFWwindow *create_window(int width, int height, const char *title) {
   return window;
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
+  if (argc < 2) {
+    fprintf(stderr, "Error: No image path provided. Usage: %s <image_path>\n",
+            argv[0]);
+    return EXIT_FAILURE;
+  }
   __attribute__((cleanup(cleanup_glfw_window))) GLFWwindow *window =
       create_window(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE);
   if (!window) {
     return EXIT_FAILURE;
   }
+
+  ImageData heightmap = load_image(argv[1]);
+  if (!heightmap.data) {
+    return EXIT_FAILURE;
+  }
+  __attribute__((cleanup(free_image))) ImageData *heightmap_ptr = &heightmap;
+  printf("%d\n", heightmap.channels);
 
   glfwSetKeyCallback(window, key_callback);
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -410,7 +446,7 @@ int main(void) {
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
   Camera camera;
-  vec3 camera_pos = {0.0f, 0.0f, 3.0f};
+  vec3 camera_pos = {heightmap.width / 2, heightmap.height / 2, 512.0f};
   vec3 camera_up = {0.0f, 1.0f, 0.0f};
   init_camera(&camera, camera_pos, camera_up, -90.0f, 0.0f);
   glfwSetWindowUserPointer(window, &camera);
@@ -446,10 +482,16 @@ int main(void) {
     glm_perspective(glm_rad(camera.fov), (float)width / (float)height,
                     NEAR_PLANE, FAR_PLANE, projection);
 
-    mat4 model;
-    glm_mat4_identity(model);
-
-    render_mesh(&cube, model, view, projection);
+    for (int y = 0; y < heightmap.height; y++) {
+      for (int x = 0; x < heightmap.width; x++) {
+        uint8_t pixel_value =
+            heightmap.data[(y * heightmap.width + x) * heightmap.channels];
+        mat4 model;
+        glm_mat4_identity(model);
+        glm_translate(model, (vec3){x, y, pixel_value});
+        render_mesh(&cube, model, view, projection);
+      }
+    }
 
     glfwSwapBuffers(window);
     glfwPollEvents();
